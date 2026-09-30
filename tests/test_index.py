@@ -48,11 +48,16 @@ def css_rule(css, selector):
     return match.group(1) if match else None
 
 
+LOGIN_URL = "https://envburiramclub.github.io/?page=login"
+# หน้าที่แค่พาไปหน้าอื่น (ไม่มี iframe ระบบสมาชิกและปุ่มลอย) ตรวจแยกใน RedirectPageTest
+REDIRECT_PAGES = {"home/login.html": LOGIN_URL}
+
+
 def site_pages():
-    """หน้าเว็บทุกหน้าที่เผยแพร่: index.html และทุกไฟล์ .html ใน home/"""
+    """หน้าระบบสมาชิกที่เผยแพร่ (iframe + ปุ่มลอย): index.html และไฟล์ .html ใน home/ ยกเว้นหน้าพาไปหน้าอื่น"""
     home = os.path.join(ROOT, "home")
     extra = sorted("home/" + n for n in os.listdir(home) if n.endswith(".html")) if os.path.isdir(home) else []
-    return ["index.html"] + extra
+    return ["index.html"] + [page for page in extra if page not in REDIRECT_PAGES]
 
 
 class PageChecks:
@@ -149,6 +154,29 @@ for _page in site_pages():
     _name = "PageTest_" + re.sub(r"\W", "_", _page)
     globals()[_name] = type(_name, (PageChecks, unittest.TestCase), {"PAGE": _page})
 del _page, _name
+
+
+class RedirectPageTest(unittest.TestCase):
+    def test_login_page_goes_to_login(self):
+        for page, target in REDIRECT_PAGES.items():
+            with self.subTest(page=page):
+                html = read(page)
+                parser = _Tags()
+                parser.feed(html)
+                parser.close()
+                refresh = [a.get("content") for tag, a, _ in parser.tags
+                           if tag == "meta" and (a.get("http-equiv") or "").lower() == "refresh"]
+                # ใช้ได้แม้ปิด JavaScript
+                self.assertEqual(refresh, ["0; url=" + target])
+                self.assertIn('location.replace("%s");' % target, html)
+                self.assertIn(target, [a.get("href") for tag, a, _ in parser.tags if tag == "a"])
+                # ปลายทางคงที่เท่านั้น ห้ามอ่าน URL จาก query/hash มาเปลี่ยนหน้า (open redirect)
+                self.assertNotRegex(html, r"location\.(?:search|hash)|URLSearchParams|document\.referrer")
+                self.assertNotIn("iframe", html)
+
+    def test_redirect_pages_exist(self):
+        for page in REDIRECT_PAGES:
+            self.assertTrue(os.path.isfile(os.path.join(ROOT, page)), page)
 
 
 class RepoTest(unittest.TestCase):
