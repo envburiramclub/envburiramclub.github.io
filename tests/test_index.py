@@ -135,10 +135,21 @@ class IndexPageTest(unittest.TestCase):
         self.assertIn(r"/^https:\/\/[a-z0-9.-]+\.googleusercontent\.com$/", self.script)
         self.assertNotIn("innerHTML =", self.script.replace('innerHTML = ""', ""))
 
+    def test_pages_workflow_deploys_index(self):
+        # ไม่มี workflow หรืออัปโหลด artifact ซ้ำ = เว็บจริงไม่อัปเดต (ปุ่มลอยไม่ขึ้นบนเว็บ)
+        wf = read(os.path.join(".github", "workflows", "static.yml"))
+        self.assertRegex(wf, r"branches:\s*\[\"main\"\]")
+        self.assertEqual(wf.count("actions/upload-pages-artifact@"), 1, "อัปโหลด artifact github-pages ได้ครั้งเดียว")
+        self.assertEqual(wf.count("actions/deploy-pages@"), 1)
+        self.assertIn("needs: build", wf)
+        self.assertIn("cp index.html _site/", wf)
+        self.assertIn("python3 -m unittest discover -s tests", wf)
+        self.assertNotRegex(wf, r"path:\s*['\"]?\.['\"]?\s*$", "ห้ามอัปโหลดทั้ง repo")
+
     def test_no_invisible_characters_in_sources(self):
         # อักขระล่องหน (zero-width, bidi control, NBSP) ซ่อนโค้ดหรือทำให้ข้อความหลอกตาได้
         for folder, dirs, files in os.walk(ROOT):
-            dirs[:] = [d for d in dirs if not d.startswith(".") and d != "__pycache__"]
+            dirs[:] = [d for d in dirs if d not in (".git", "__pycache__")]
             for name in files:
                 if not name.endswith(SOURCE_EXTENSIONS):
                     continue

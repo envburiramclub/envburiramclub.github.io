@@ -1,0 +1,51 @@
+# เผยแพร่หน้าเว็บขึ้น GitHub Pages ทุกครั้งที่ push ไปที่ main (Settings > Pages > Source: GitHub Actions)
+# รันเทสต์ก่อน ถ้าไม่ผ่านจะไม่เผยแพร่ และอัปโหลดเฉพาะไฟล์หน้าเว็บ (ไม่รวม tests/ และ .github/)
+name: Deploy static content to Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# เผยแพร่ทีละครั้ง ไม่ยกเลิกรอบที่กำลังเผยแพร่อยู่
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Run tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+      - name: Stage site files
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          touch _site/.nojekyll
+      # อัปโหลด artifact "github-pages" ครั้งเดียวเท่านั้น (เดิมอัปโหลดซ้ำใน job deploy
+      # ทำให้ deploy-pages ล้มด้วย "Multiple artifacts named github-pages" และเว็บไม่อัปเดต)
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
