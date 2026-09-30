@@ -30,6 +30,47 @@
       .slow { font-size: 14px; color: #4b5563; }
       @keyframes spin { to { transform: rotate(360deg); } }
       @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+      /* ปุ่มลอยไประบบรวมเครื่องมือ (repo claude-code) มุมขวาล่าง อยู่เหนือ iframe (#app) และหน้ารอโหลด (.note z-index 1) */
+      .tools-fab {
+        position: fixed; z-index: 10;
+        /* ค่าแรกสำรองให้เบราว์เซอร์ที่ไม่รู้จัก env() ไม่งั้นปุ่มจะหลุดจากมุมจอ */
+        right: 16px; bottom: 16px;
+        right: calc(16px + env(safe-area-inset-right, 0px));
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        display: flex; align-items: center; justify-content: center;
+        width: 52px; height: 52px; box-sizing: border-box; border-radius: 50%;
+        border: 2px solid #fff; background: #0f766e; color: #fff; text-decoration: none;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25), 0 8px 20px rgba(15, 23, 42, 0.18);
+        -webkit-tap-highlight-color: transparent;
+        transition: background-color 0.15s, transform 0.15s;
+      }
+      .tools-fab svg { display: block; width: 26px; height: 26px; fill: currentColor; }
+      .tools-fab:active { transform: scale(0.94); }
+      .tools-fab:focus-visible { outline: 3px solid #0b5e58; outline-offset: 3px; }
+      /* ป้ายชื่อแสดงด้านซ้ายของปุ่มตอนชี้เมาส์หรือกด Tab; pointer-events: none เพื่อไม่บังการคลิกใน iframe */
+      .tools-fab-label {
+        position: absolute; right: calc(100% + 10px); top: 50%; transform: translateY(-50%);
+        padding: 6px 12px; border-radius: 8px; white-space: nowrap;
+        font: 600 14px/1.4 Sarabun, "Noto Sans Thai", system-ui, sans-serif;
+        background: #1f2937; color: #fff; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+        opacity: 0; pointer-events: none; transition: opacity 0.15s;
+      }
+      .tools-fab:focus-visible .tools-fab-label { opacity: 1; }
+      /* จอสัมผัสไม่มี hover จริง (สถานะ :hover ค้างหลังแตะ) จึงให้ขยาย/แสดงป้ายเฉพาะอุปกรณ์ที่มีเมาส์ */
+      @media (hover: hover) {
+        .tools-fab:hover { background: #0b5e58; transform: scale(1.06); }
+        .tools-fab:hover .tools-fab-label { opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .tools-fab, .tools-fab-label { transition: none; }
+        .tools-fab:hover, .tools-fab:active { transform: none; }
+      }
+      @media (forced-colors: active) {
+        .tools-fab { border-color: ButtonText; }
+        .tools-fab-label { border: 1px solid CanvasText; }
+      }
+      @media print { .tools-fab { display: none; } }
     </style>
   </head>
   <body>
@@ -41,6 +82,14 @@
     <noscript>
       <div class="note">กรุณาเปิดใช้งาน JavaScript ในเบราว์เซอร์เพื่อใช้งานระบบรับสมัครสมาชิก</div>
     </noscript>
+    <!-- ปุ่มลอยเชื่อมไประบบรวมเครื่องมือ ใช้ได้แม้ปิด JavaScript ต้องเป็นลูกของ <body> โดยตรง (สคริปต์แทรก iframe ไว้ก่อนปุ่ม)
+         เปิดแท็บใหม่เพื่อไม่ให้ข้อมูลที่กรอกค้างในระบบสมาชิกหาย
+         noreferrer: ไม่ส่ง URL หน้านี้ (อาจมีพารามิเตอร์ของสมาชิกใน ?query) ไปกับลิงก์ และตัด window.opener -->
+    <a class="tools-fab" id="tools-fab" href="https://envburiramclub.github.io/claude-code/"
+       target="_blank" rel="noopener noreferrer" aria-label="เปิดระบบรวมเครื่องมือในแท็บใหม่">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.66 6.17A5 5 0 0 1 13.97 12.57L5.77 20.77A1.8 1.8 0 0 1 3.23 18.23L11.43 10.03A5 5 0 0 1 17.83 3.35L14.59 6.59L17.41 9.41Z"/></svg>
+      <span class="tools-fab-label" aria-hidden="true">รวมเครื่องมือ</span>
+    </a>
     <script>
       (function () {
         "use strict";
@@ -126,7 +175,9 @@
         }, 15000);
     
         frame.src = EXEC_URL + "?" + q.toString();
-        document.body.appendChild(frame);
+        // แทรก iframe ก่อนปุ่มรวมเครื่องมือ ให้ลำดับการกด Tab ไปที่ฟอร์มสมาชิกก่อนปุ่มลอย
+        // (ถ้าไม่มีปุ่ม getElementById คืน null และ insertBefore จะต่อท้ายเหมือน appendChild)
+        document.body.insertBefore(frame, document.getElementById("tools-fab"));
       })();
     </script>
   </body>
