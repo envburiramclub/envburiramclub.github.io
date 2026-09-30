@@ -48,9 +48,19 @@ def css_rule(css, selector):
     return match.group(1) if match else None
 
 
-class IndexPageTest(unittest.TestCase):
+def site_pages():
+    """หน้าเว็บทุกหน้าที่เผยแพร่: index.html และทุกไฟล์ .html ใน home/"""
+    home = os.path.join(ROOT, "home")
+    extra = sorted("home/" + n for n in os.listdir(home) if n.endswith(".html")) if os.path.isdir(home) else []
+    return ["index.html"] + extra
+
+
+class PageChecks:
+    """เทสต์ที่ใช้กับทุกหน้า (หน้า home/ เป็นหน้ารับสมัครสมาชิกแบบเดียวกัน ต้องปลอดภัยเท่ากัน)"""
+    PAGE = "index.html"
+
     def setUp(self):
-        self.html = read("index.html")
+        self.html = read(self.PAGE)
         parser = _Tags()
         parser.feed(self.html)
         parser.close()
@@ -135,6 +145,13 @@ class IndexPageTest(unittest.TestCase):
         self.assertIn(r"/^https:\/\/[a-z0-9.-]+\.googleusercontent\.com$/", self.script)
         self.assertNotIn("innerHTML =", self.script.replace('innerHTML = ""', ""))
 
+for _page in site_pages():
+    _name = "PageTest_" + re.sub(r"\W", "_", _page)
+    globals()[_name] = type(_name, (PageChecks, unittest.TestCase), {"PAGE": _page})
+del _page, _name
+
+
+class RepoTest(unittest.TestCase):
     def test_pages_workflow_deploys_index(self):
         # ไม่มี workflow หรืออัปโหลด artifact ซ้ำ = เว็บจริงไม่อัปเดต (ปุ่มลอยไม่ขึ้นบนเว็บ)
         wf = read(os.path.join(".github", "workflows", "static.yml"))
@@ -145,6 +162,12 @@ class IndexPageTest(unittest.TestCase):
         self.assertIn("cp index.html _site/", wf)
         self.assertIn("python3 -m unittest discover -s tests", wf)
         self.assertNotRegex(wf, r"path:\s*['\"]?\.['\"]?\s*$", "ห้ามอัปโหลดทั้ง repo")
+        if os.path.isdir(os.path.join(ROOT, "home")):
+            # เผยแพร่เฉพาะไฟล์ .html ของ home/ (ไม่คัดลอกทั้งโฟลเดอร์ กันไฟล์อื่นหลุดขึ้นเว็บโดยไม่ตั้งใจ)
+            self.assertIn("cp home/*.html _site/home/", wf)
+
+    def test_site_pages_found(self):
+        self.assertIn("index.html", site_pages())
 
     def test_no_invisible_characters_in_sources(self):
         # อักขระล่องหน (zero-width, bidi control, NBSP) ซ่อนโค้ดหรือทำให้ข้อความหลอกตาได้

@@ -1,5 +1,5 @@
 # เผยแพร่หน้าเว็บขึ้น GitHub Pages ทุกครั้งที่ push ไปที่ main (Settings > Pages > Source: GitHub Actions)
-# รันเทสต์ก่อน ถ้าไม่ผ่านจะไม่เผยแพร่ และอัปโหลดเฉพาะไฟล์หน้าเว็บ (ไม่รวม tests/ และ .github/)
+# รันเทสต์ก่อน ถ้าไม่ผ่านจะไม่เผยแพร่ และอัปโหลดเฉพาะไฟล์หน้าเว็บ index.html และ home/*.html (ไม่รวม tests/ และ .github/)
 name: Deploy static content to Pages
 
 on:
@@ -31,6 +31,9 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html _site/
+          # หน้า home/ (https://envburiramclub.github.io/home/) คัดลอกเฉพาะไฟล์ .html
+          mkdir -p _site/home
+          cp home/*.html _site/home/
           touch _site/.nojekyll
       # อัปโหลด artifact "github-pages" ครั้งเดียวเท่านั้น (เดิมอัปโหลดซ้ำใน job deploy
       # ทำให้ deploy-pages ล้มด้วย "Multiple artifacts named github-pages" และเว็บไม่อัปเดต)
