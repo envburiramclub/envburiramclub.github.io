@@ -210,6 +210,17 @@ class RepoTest(unittest.TestCase):
         self.assertEqual(wf.count("actions/upload-pages-artifact@"), 1, "อัปโหลด artifact github-pages ได้ครั้งเดียว")
         self.assertEqual(wf.count("actions/deploy-pages@"), 1)
         self.assertIn("needs: build", wf)
+        # สิทธิ์เผยแพร่ต้องอยู่เฉพาะ job deploy ไม่ใช่ทั้ง workflow (job build รันโค้ดเทสต์)
+        top = wf[:wf.index("jobs:")]
+        self.assertRegex(top, r"permissions:\s*\n\s+contents: read\s*\n")
+        self.assertNotIn("pages: write", top)
+        self.assertNotIn("id-token: write", top)
+        build = wf[wf.index("  build:"):wf.index("  deploy:")]
+        self.assertNotIn("write", build)
+        self.assertIn("persist-credentials: false", build)
+        deploy = wf[wf.index("  deploy:"):]
+        self.assertIn("pages: write", deploy)
+        self.assertIn("id-token: write", deploy)
         self.assertIn("cp index.html _site/", wf)
         self.assertIn("python3 -m unittest discover -s tests", wf)
         self.assertNotRegex(wf, r"path:\s*['\"]?\.['\"]?\s*$", "ห้ามอัปโหลดทั้ง repo")

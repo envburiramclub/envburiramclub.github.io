@@ -7,10 +7,10 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
+# ค่าเริ่มต้นอ่านได้อย่างเดียว สิทธิ์เผยแพร่ (pages/id-token) ให้เฉพาะ job deploy
+# job build รันโค้ดใน repo (เทสต์) จึงไม่ควรถือสิทธิ์เขียน
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # เผยแพร่ทีละครั้ง ไม่ยกเลิกรอบที่กำลังเผยแพร่อยู่
 concurrency:
@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Run tests
         run: python3 -m unittest discover -s tests -v
       - name: Setup Pages
@@ -44,6 +46,9 @@ jobs:
 
   deploy:
     needs: build
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
