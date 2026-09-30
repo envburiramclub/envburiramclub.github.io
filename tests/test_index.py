@@ -49,15 +49,29 @@ def css_rule(css, selector):
 
 
 LOGIN_URL = "https://envburiramclub.github.io/?page=login"
-# หน้าที่แค่พาไปหน้าอื่น (ไม่มี iframe ระบบสมาชิกและปุ่มลอย) ตรวจแยกใน RedirectPageTest
-REDIRECT_PAGES = {"home/login.html": LOGIN_URL}
+# ปลายทางของหน้าพาไปหน้าอื่นใน home/ ต้องเป็นหน้าหลักของเว็บนี้ + ?page=<ชื่อ> เท่านั้น (กัน open redirect)
+REDIRECT_TARGET = re.compile(r"https://envburiramclub\.github\.io/\?page=[a-z0-9_-]{1,40}\Z")
+# หน้าที่ต้องพาไปปลายทางนี้เสมอ
+EXPECTED_REDIRECTS = {"home/login.html": LOGIN_URL}
+
+
+def home_pages():
+    home = os.path.join(ROOT, "home")
+    return sorted("home/" + n for n in os.listdir(home) if n.endswith(".html")) if os.path.isdir(home) else []
+
+
+def is_redirect_page(page):
+    """หน้าที่มี <meta http-equiv="refresh"> คือหน้าพาไปหน้าอื่น (ไม่มี iframe ระบบสมาชิกและปุ่มลอย)"""
+    return re.search(r"<meta\s+http-equiv=\"refresh\"", read(page), re.I) is not None
 
 
 def site_pages():
-    """หน้าระบบสมาชิกที่เผยแพร่ (iframe + ปุ่มลอย): index.html และไฟล์ .html ใน home/ ยกเว้นหน้าพาไปหน้าอื่น"""
-    home = os.path.join(ROOT, "home")
-    extra = sorted("home/" + n for n in os.listdir(home) if n.endswith(".html")) if os.path.isdir(home) else []
-    return ["index.html"] + [page for page in extra if page not in REDIRECT_PAGES]
+    """หน้าระบบสมาชิก (iframe + ปุ่มลอย): index.html และไฟล์ .html ใน home/ ที่ไม่ใช่หน้าพาไปหน้าอื่น"""
+    return ["index.html"] + [page for page in home_pages() if not is_redirect_page(page)]
+
+
+def redirect_pages():
+    return [page for page in home_pages() if is_redirect_page(page)]
 
 
 class PageChecks:
@@ -157,26 +171,35 @@ del _page, _name
 
 
 class RedirectPageTest(unittest.TestCase):
-    def test_login_page_goes_to_login(self):
-        for page, target in REDIRECT_PAGES.items():
+    def test_redirect_pages_go_to_fixed_target(self):
+        for page in redirect_pages():
             with self.subTest(page=page):
                 html = read(page)
                 parser = _Tags()
                 parser.feed(html)
                 parser.close()
-                refresh = [a.get("content") for tag, a, _ in parser.tags
+                refresh = [a.get("content") or "" for tag, a, _ in parser.tags
                            if tag == "meta" and (a.get("http-equiv") or "").lower() == "refresh"]
-                # ใช้ได้แม้ปิด JavaScript
-                self.assertEqual(refresh, ["0; url=" + target])
+                self.assertEqual(len(refresh), 1)
+                self.assertTrue(refresh[0].startswith("0; url="), refresh[0])
+                target = refresh[0][len("0; url="):]
+                self.assertRegex(target, REDIRECT_TARGET)
+                # meta refresh (ปิด JavaScript), location.replace และลิงก์สำรอง ต้องไปที่เดียวกัน
                 self.assertIn('location.replace("%s");' % target, html)
-                self.assertIn(target, [a.get("href") for tag, a, _ in parser.tags if tag == "a"])
+                links = [a.get("href") for tag, a, _ in parser.tags if tag == "a"]
+                self.assertEqual(links, [target])
+                self.assertEqual([a.get("href") for tag, a, _ in parser.tags if tag == "link" and a.get("rel") == "canonical"], [target])
+                self.assertEqual(re.findall(r"https?://[^\s\"'<>]+", html), [target] * 4, "ห้ามมีปลายทางอื่นปน")
                 # ปลายทางคงที่เท่านั้น ห้ามอ่าน URL จาก query/hash มาเปลี่ยนหน้า (open redirect)
-                self.assertNotRegex(html, r"location\.(?:search|hash)|URLSearchParams|document\.referrer")
+                self.assertNotRegex(html, r"location\.(?:search|hash|href\s*=)|URLSearchParams|document\.referrer|innerHTML|eval\(")
                 self.assertNotIn("iframe", html)
+                self.assertIn('<meta name="robots" content="noindex">', html)
 
-    def test_redirect_pages_exist(self):
-        for page in REDIRECT_PAGES:
-            self.assertTrue(os.path.isfile(os.path.join(ROOT, page)), page)
+    def test_expected_redirects(self):
+        for page, target in EXPECTED_REDIRECTS.items():
+            with self.subTest(page=page):
+                self.assertIn(page, redirect_pages())
+                self.assertIn('content="0; url=%s"' % target, read(page))
 
 
 class RepoTest(unittest.TestCase):
@@ -196,6 +219,8 @@ class RepoTest(unittest.TestCase):
 
     def test_site_pages_found(self):
         self.assertIn("index.html", site_pages())
+        # ทุกหน้าใน home/ ต้องถูกตรวจ: เป็นหน้าระบบสมาชิกหรือหน้าพาไปหน้าอื่นอย่างใดอย่างหนึ่ง
+        self.assertEqual(sorted(site_pages()[1:] + redirect_pages()), home_pages())
 
     def test_no_invisible_characters_in_sources(self):
         # อักขระล่องหน (zero-width, bidi control, NBSP) ซ่อนโค้ดหรือทำให้ข้อความหลอกตาได้
