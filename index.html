@@ -94,7 +94,9 @@
       (function () {
         "use strict";
         
-        let EXEC_URL = "https://script.google.com/macros/s/AKfycbyU041meiZ6klQSLnsYfbTwc2tv21OyO3Dx2ji3n2qvKs6XXxhWZAVyI0Rg0bHOdEO1_A/exec";
+        // let EXEC_URL = "https://script.google.com/macros/s/AKfycbyU041meiZ6klQSLnsYfbTwc2tv21OyO3Dx2ji3n2qvKs6XXxhWZAVyI0Rg0bHOdEO1_A/exec";
+
+        let EXEC_URL = "https://script.google.com/macros/s/AKfycbzmhWGMJw47nWuiIrbY4wxVCP8kvtedFUoLnepwvqCPuIpRXak7Q74UF3gU5SxhibcK/exec";
     
         let EXEC_RE = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/;
         
@@ -117,7 +119,7 @@
             if (a.target === "_blank") a.rel = "noopener";
             loading.appendChild(a);
           }
-        }
+        0}
         
         if (window.top !== window.self) {
           note("หน้านี้ถูกนำไปแสดงซ้อนในเว็บไซต์อื่น เพื่อความปลอดภัยจึงไม่แสดงเนื้อหา",
